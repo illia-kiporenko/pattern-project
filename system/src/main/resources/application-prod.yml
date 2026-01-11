@@ -1,0 +1,38 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  application:
+    name: system-service
+  security:
+    jwt:
+      # IMPORTANT: Generate a secure, long, Base64-encoded secret key for production
+      # You can use an online generator for a 256-bit or 512-bit key.
+      secret-key: ${JWT_SECRET_KEY:NzUzNzkyZTc5NTE0YzQ5NzQ3NzY4NzI3MTM2NTkzMjVkNmU2MTViNDQzMTZiMjg0YTM1MzEzNTVl}
+      # Expiration time in milliseconds (e.g., 86400000 = 24 hours)
+      expiration: ${JWT_EXPIRATION:86400000}
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  
+  datasource:
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+
+logging:
+  level:
+    me.kiporenko: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+  file:
+    name: /var/log/system-service/system-service.log
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: never

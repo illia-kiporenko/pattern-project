@@ -3,6 +3,7 @@ package me.kiporenko.system.model;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString; // <-- Import this
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +21,6 @@ public class Blog {
 
     @OneToMany(mappedBy = "blog", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JsonManagedReference
+    @ToString.Exclude
     private List<Post> posts = new ArrayList<>();
-
 }

@@ -28,6 +28,7 @@ public class SecurityConfiguration {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        System.out.println("Filtering...");
         /*http
                 .csrf()
                 .disable()
@@ -45,15 +46,15 @@ public class SecurityConfiguration {
         return http.build();*/
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(auth->{
-                    auth.requestMatchers("/api/auth/**").permitAll();
-                })
-                .authorizeHttpRequests(auth->{
-                    auth.requestMatchers("/user").hasAuthority("USER");
-                })
-                .authorizeHttpRequests(auth->{
-                    auth.requestMatchers("/admin").hasAuthority("ADMIN");
-                })
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/files").permitAll()
+                        .requestMatchers("/api/blog").hasAuthority("USER")
+                        .requestMatchers("/user").hasAuthority("USER")
+                        .requestMatchers("/admin").hasAuthority("ADMIN")
+                        .anyRequest().authenticated()
+                )
+
                 .sessionManagement(httpSecuritySessionManagementConfigurer ->
                         httpSecuritySessionManagementConfigurer.sessionCreationPolicy(
                                 SessionCreationPolicy.STATELESS))

@@ -1,70 +1,95 @@
 package me.kiporenko.system.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
+import me.kiporenko.system.exception.EntityNotFoundException;
+import me.kiporenko.system.mapper.PostMapper;
+import me.kiporenko.system.model.Post;
+import me.kiporenko.system.model.dto.PageDTO;
+import me.kiporenko.system.model.dto.PostResponseDTO;
 import me.kiporenko.system.repository.PostRepository;
 import me.kiporenko.system.service.PostService;
-import me.kiporenko.system.exception.EntityNotFoundException;
-import me.kiporenko.system.model.Post;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
 public class PostServiceImpl implements PostService {
 
-	private final PostRepository postRepository;
+    private final PostRepository postRepository;
+    private final PostMapper postMapper;
 
-	@Autowired
-	public PostServiceImpl(PostRepository postRepository) {
-		this.postRepository = postRepository;
-	}
+    @Autowired
+    public PostServiceImpl(PostRepository postRepository, PostMapper postMapper) {
+        this.postRepository = postRepository;
+        this.postMapper = postMapper;
+    }
 
-	@Override
-	public List<Post> getPosts(Long blogId) {
-		log.info("Get posts by blog Id: {}", blogId);
-		return postRepository.findAllByBlogId(blogId);
-	}
+    @Override
+    @Cacheable(cacheNames = "posts_by_blog", key = "#blogId + '-page-' + #pageable.pageNumber + '-size-' + #pageable.pageSize + '-sort-' + #pageable.sort.hashCode()")
+    public PageDTO<PostResponseDTO> getPosts(Long blogId, Pageable pageable) {
+        log.info("DATABASE HIT: Fetching posts for blog Id: {} and page: {}", blogId, pageable.getPageNumber());
+        Page<Post> postPage = postRepository.findAllByBlogId(blogId, pageable);
 
-	@Override
-	public Post getPostById(Long id) {
-		log.info("Get post by id: {}", id);
-		return postRepository.findById(id).orElseThrow(
-				() -> new EntityNotFoundException("Post ", id)
-		);
-	}
+        Page<PostResponseDTO> dtoPage = postPage.map(postMapper::toDto);
 
-	@Override
-	public void createPost(Post post) {
-		log.info("Creating post: {}", post);
-		postRepository.save(post);
-	}
+        return new PageDTO<>(dtoPage);
+    }
 
-	@Override
-	public void deletePost(Long postId) {
-		postRepository.deletePostById(postId);
-	}
+    @Override
+    @Cacheable(cacheNames = "posts", key = "#id")
+    public Post getPostById(Long id) {
+        log.info("DATABASE HIT: Fetching post by id: {}", id);
+        return postRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("Post", id));
+    }
 
-	@Override
-	public void updatePost(Post post, Long id) {
-		log.info("Update customer with id {}", id);
-		Post postToUpdate = postRepository.findById(id)
-				.orElseThrow(() -> new EntityNotFoundException("Post", id));
+    @Override
+    @Transactional
+    // FIX: Explicitly name the cache
+    @CacheEvict(cacheNames = "posts_by_blog", allEntries = true)
+    public Post createPost(Post post) {
+        log.info("Creating post: {} and invalidating 'posts_by_blog' cache", post);
+        return postRepository.save(post);
+    }
 
-		if(post.getTitle() != null) {
-			postToUpdate.setTitle(post.getTitle());
-		}
-		if(post.getPlot() != null) {
-			postToUpdate.setPlot(post.getPlot());
-		}
-		if(post.getLikesNumber()!=null){
-			postToUpdate.setLikesNumber(post.getLikesNumber());
-		}
-		if(post.getDislikesNumber()!=null){
-			postToUpdate.setDislikesNumber(post.getDislikesNumber());
-		}
+    @Override
+    @Transactional
+    // FIX: Explicitly name the cache in both inner annotations
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "posts", key = "#id"),
+            @CacheEvict(cacheNames = "posts_by_blog", allEntries = true)
+    })
+    public void updatePost(Post post, Long id) {
+        log.info("Updating post with id {}", id);
+        Post postToUpdate = this.getPostById(id);
 
-		postRepository.save(postToUpdate);
-	}
+        if (post.getTitle() != null) postToUpdate.setTitle(post.getTitle());
+        if (post.getPlot() != null) postToUpdate.setPlot(post.getPlot());
+
+        postRepository.save(postToUpdate);
+    }
+
+    @Override
+    @Transactional
+    // FIX: Explicitly name the cache in both inner annotations
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "posts", key = "#postId"),
+            @CacheEvict(cacheNames = "posts_by_blog", allEntries = true)
+    })
+    public void deletePost(Long postId) {
+        log.info("Deleting post with id {}", postId);
+        if (!postRepository.existsById(postId)) {
+            throw new EntityNotFoundException("Post", postId);
+        }
+        postRepository.deleteById(postId);
+    }
+
+    private PostResponseDTO convertToDto(Post post) {
+        return new PostResponseDTO(post.getId(), post.getTitle(), post.getPlot(), post.getLikesNumber(), post.getDislikesNumber());
+    }
 }

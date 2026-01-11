@@ -3,6 +3,7 @@ package me.kiporenko.system.model;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString; // <-- Import this
 
 @Data
 @Entity
@@ -21,6 +22,6 @@ public class Post {
     @ManyToOne
     @JoinColumn(name = "blog_id")
     @JsonBackReference
+    @ToString.Exclude
     private Blog blog;
-
 }
